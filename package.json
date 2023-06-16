@@ -1,0 +1,8 @@
+{
+            "name": "com.orbitar.packageslist",
+            "version": "0.0.1",
+            "displayName": "PackagesList",
+            "description": "",
+            "unity": "2021.3",
+            "dependencies": {}
+        }
