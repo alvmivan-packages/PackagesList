@@ -1,6 +1,8 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Net;
+using PackagesList.TokenSecure;
 using UnityEditor;
 using UnityEngine;
 
@@ -15,11 +17,21 @@ public class ListPackages : EditorWindow
         window.Show();
     }
 
+    string token;
     List<PackageInfo> packages = new List<PackageInfo>();
 
     void OnGUI()
     {
-        Fetch();
+        if (GUILayout.Button("Fetch Packages"))
+        {
+            Fetch();
+        }
+
+        if (GUILayout.Button("Clear List"))
+        {
+            packages.Clear();
+        }
+
         DisplayPackages();
     }
 
@@ -31,11 +43,40 @@ public class ListPackages : EditorWindow
             return;
         }
 
+        bool displayPrivates = false;
+
+        if (packages.Any(p => p.isPrivate))
+        {
+            if (string.IsNullOrEmpty(token))
+            {
+                EditorGUILayout.LabelField("<<There are private packages, please enter your token>>");
+                if (GUILayout.Button("Get Token"))
+                {
+                    Tokens.GetToken(t => token = t);
+                    return;
+                }
+            }
+            else
+            {
+                displayPrivates = true;
+            }
+        }
+
+
+        const string EmojiDeCandadoAbierto = "🔓";
+        const string EmojiDeCandadoCerrado = "🔒";
+
+
         foreach (var package in packages)
         {
+            if (package.isPrivate && !displayPrivates) continue;
+
+            var suffix = package.isPrivate ? "(private) " + EmojiDeCandadoCerrado : EmojiDeCandadoAbierto;
+
             EditorGUILayout.BeginHorizontal();
 
-            EditorGUILayout.LabelField(package.name);
+
+            EditorGUILayout.LabelField(package.name + suffix);
 
             if (GUILayout.Button("Copy Url"))
             {
@@ -54,38 +95,64 @@ public class ListPackages : EditorWindow
 
     async void Fetch()
     {
-        if (GUILayout.Button("Fetch Packages"))
+        var webClient = new WebClient();
+        webClient.Headers.Add("User-Agent", "UnityWebRequest");
+        string url;
+ 
+
+        if (string.IsNullOrEmpty(token))
         {
-            // Ask GitHub for the repositories of the user
-            var url = $"https://api.github.com/users/{githubUser}/repos";
-            var webClient = new WebClient();
-            webClient.Headers.Add("User-Agent", "UnityWebRequest");
+            url = $"https://api.github.com/orgs/{githubUser}/repos";  //get public repos from the org
+            Debug.Log("Asking without token");
+        }
+        else
+        {
+            url = $"https://api.github.com/orgs/{githubUser}/repos";  //get all repos from the org
+            webClient.Headers.Add("Authorization", "token " + token);
+            Debug.Log("Adding auth : " + token);
+        }
 
-            try
+
+        try
+        {
+            var json = await webClient.DownloadStringTaskAsync(url);
+            LogJson(json);
+            var repositories = JsonHelper.FromJson<RepositoryDto>(json);
+            packages.Clear();
+
+            foreach (var repository in repositories)
             {
-                var json = await webClient.DownloadStringTaskAsync(url);
-
-                var repositories = JsonHelper.FromJson<RepositoryDto>(json);
-                packages.Clear();
-
-                foreach (var repository in repositories)
+                var package = new PackageInfo
                 {
-                    var package = new PackageInfo
-                    {
-                        name = repository.name,
-                        url = repository.html_url,
-                        urlForUPM = $"{repository.html_url}.git#{repository.default_branch}"
-                    };
+                    name = repository.name,
+                    url = repository.html_url,
+                    urlForUPM = GetUrlForUpm(repository),
+                };
 
-                    packages.Add(package);
-                }
+                packages.Add(package);
             }
-            catch (Exception e)
+        }
+        catch (Exception e)
+        {
+            var error = "Failed to fetch packages: " + e.Message;
+            if (EditorUtility.DisplayDialog("Error", error, "OK"))
             {
-                Debug.LogError("Failed to fetch packages: " + e.Message);
+                Debug.LogError(error);
+                Debug.LogException(e);
             }
         }
     }
+
+
+    static void LogJson(string json)
+    {
+        //copy json to clipboard to debug in another place
+        EditorGUIUtility.systemCopyBuffer = $"START\n{json}\n END!";
+    }
+
+    string GetUrlForUpm(RepositoryDto repoDto) => repoDto.@private
+        ? $"https://x-access-token:{token}@github.com/{githubUser}/{repoDto.name}.git#{repoDto.default_branch}"
+        : $"{repoDto.html_url}.git#{repoDto.default_branch}";
 }
 
 [Serializable]
@@ -94,6 +161,7 @@ struct RepositoryDto
     public string name;
     public string html_url;
     public string default_branch;
+    public bool @private;
 }
 
 [Serializable]
@@ -102,6 +170,7 @@ public struct PackageInfo
     public string name;
     public string url;
     public string urlForUPM;
+    public bool isPrivate;
 }
 
 public static class JsonHelper
