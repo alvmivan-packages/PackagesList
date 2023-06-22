@@ -31,7 +31,7 @@ Keeping these practices, along with the security measures we implement, will ens
         readonly IField<bool> isOrganization = new EditorPrefsBoolField("PackagesList.UserName.IsOrg");
         readonly List<PackageInfo> packages = new();
 
-        [MenuItem("Packages/List")]
+        [MenuItem("Orbitar/Packages/List")]
         public static void ShowWindow()
         {
             var window = GetWindow<ListPackages>(false, "Packages List");
