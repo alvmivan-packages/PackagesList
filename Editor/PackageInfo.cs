@@ -9,13 +9,15 @@ namespace PackagesList
         public string url;
         public string urlForUPM;
         public bool isPrivate;
+        public string branch;
 
-        public PackageInfo(string name, string url, string urlForUpm, bool isPrivate)
+        public PackageInfo(string name, string url, string urlForUpm, bool isPrivate, string branch)
         {
             this.name = name;
             this.url = url;
             urlForUPM = urlForUpm;
             this.isPrivate = isPrivate;
+            this.branch = branch;
         }
     }
 }

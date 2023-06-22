@@ -85,6 +85,10 @@ Keeping these practices, along with the security measures we implement, will ens
             {
                 token.Value = await Tokens.GetTokenAsync();
             }
+            if(GUILayout.Button("New Token"))
+            {
+                Tokens.OpenTokenPage();
+            }
         }
 
         async void FetchPackages()

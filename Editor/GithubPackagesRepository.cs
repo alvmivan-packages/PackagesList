@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Net;
+using System.Net.Http;
 using System.Threading.Tasks;
 using UnityEditor;
 using UnityEngine;
@@ -39,11 +40,22 @@ namespace PackagesList
                 var json = await webClient.DownloadStringTaskAsync(url);
 
 
-                return JsonHelper.FromJson<RepositoryDto>(json).Select(ToPackageInfo).ToList();
+                var list = JsonHelper.FromJson<RepositoryDto>(json).Select(ToPackageInfo).ToList();
+
+                // is this a package
+
+                var validations = list.Select(IsThisAPackage).ToArray();
+
+                var results = await Task.WhenAll(validations);
+
+                list = list.Where((_, i) => results[i]).ToList();
+
+                return list;
             }
             catch (Exception e)
             {
-                Debug.LogException(e);
+                // Debug.LogException(e);
+                Debug.LogError("trying : " + url + " \nError : \n" + e.Message);
                 throw;
             }
         }
@@ -52,8 +64,8 @@ namespace PackagesList
             ? $"https://x-access-token:{token}@github.com/{githubUser}/{repoDto.name}.git#{repoDto.default_branch}"
             : $"{repoDto.html_url}.git#{repoDto.default_branch}";
 
-        PackageInfo ToPackageInfo(RepositoryDto repository) => new PackageInfo(repository.name, repository.html_url,
-            GetUrlForUpm(repository), repository.@private);
+        PackageInfo ToPackageInfo(RepositoryDto repository) => new(repository.name, repository.html_url,
+            GetUrlForUpm(repository), repository.@private, repository.default_branch);
 
         string PrepareWebClient(WebClient webClient)
         {
@@ -69,6 +81,20 @@ namespace PackagesList
 
             var orgOrUser = isOrganization ? "orgs" : "users";
             return $"https://api.github.com/{orgOrUser}/{githubUser}/repos";
+        }
+
+        async Task<bool> IsThisAPackage(PackageInfo package) =>
+            await GithubTools.HasFile(package.url, package.branch, token, "package.json")
+            && !await GithubTools.HasFile(package.url, package.branch, token, ".ignorePackagesList");
+
+
+        [Serializable]
+        struct RepositoryDto
+        {
+            public string name;
+            public string html_url;
+            public string default_branch;
+            public bool @private;
         }
     }
 }

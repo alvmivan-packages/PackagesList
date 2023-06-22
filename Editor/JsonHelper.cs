@@ -7,13 +7,13 @@ namespace PackagesList
     {
         public static T[] FromJson<T>(string json)
         {
-            string fixedJson = "{\"repositories\":" + json + "}";
-            Wrapper<T> wrapper = JsonUtility.FromJson<Wrapper<T>>(fixedJson);
+            var fixedJson = "{\"repositories\":" + json + "}";
+            var wrapper = JsonUtility.FromJson<Wrapper<T>>(fixedJson);
             return wrapper.repositories;
         }
 
         [Serializable]
-        private class Wrapper<T>
+        class Wrapper<T>
         {
             public T[] repositories;
         }

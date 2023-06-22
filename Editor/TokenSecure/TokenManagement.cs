@@ -5,10 +5,10 @@ using UnityEngine;
 
 namespace PackagesList.TokenSecure
 {
-    public static class TokenManagement
+    static class TokenManagement
     {
         internal static string TokenCache;
-        const int MinCharsForPassword = 8;
+        const int MinCharsForPassword = 4;
         const int MaxCharsForPassword = 32;
         const string SavingKey = "GH_Token_PackageList";
         const string SavingKeyPasswordValidator = "GH_Token_PackageList_PasswordValidator";

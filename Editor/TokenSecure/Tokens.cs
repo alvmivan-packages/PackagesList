@@ -26,5 +26,7 @@ namespace PackagesList.TokenSecure
 
             return await tcs.Task;
         }
+
+        public static void OpenTokenPage() => TokenManagement.OpenGitHubForToken();
     }
 }
