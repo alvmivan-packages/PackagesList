@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Net;
 using PackagesList.TokenSecure;
+using Unity.VisualScripting.YamlDotNet.Core.Tokens;
 using UnityEditor;
 using UnityEngine;
 using UnityEngine.Rendering.RendererUtils;
@@ -11,10 +12,18 @@ namespace PackagesList
 {
     public class ListPackages : EditorWindow
     {
-        public string githubUser = "";
-        bool isOrganization;
+        const string TokenSecurityAdvice = @"Your GitHub token is vital for the security of your data. 
+When you provide your token to our application, we internally encrypt it with a password before storing it. 
+This extra step of security means that even if someone manages to access the application's database, they won't be able to use your token as it will be encrypted.
+However, it's important to remember that you should still follow good security practices with your token. 
+Only enable 'repo' permissions, rotate it regularly, never share it, and revoke it if you suspect it's compromised. 
+Keeping these practices, along with the security measures we implement, will ensure the protection of your GitHub data and resources.";
 
-        string token;
+        Vector2 scroll;
+
+        readonly IField<string> token = new InMemoryField<string>();
+        readonly IField<string> githubUser = new EditorPrefsStringField("PackagesList.UserName");
+        readonly IField<bool> isOrganization = new EditorPrefsBoolField("PackagesList.UserName.IsOrg");
         readonly List<PackageInfo> packages = new();
 
         [MenuItem("Packages/List")]
@@ -25,13 +34,26 @@ namespace PackagesList
             window.Show();
         }
 
-
         void OnGUI()
         {
-            HandleUserName();
+            EditorGUILayout.BeginHorizontal();
+
+            githubUser.Value = EditorGUILayout.TextField("Github User", githubUser.Value, GUILayout.MinWidth(600));
+            isOrganization.Value = EditorGUILayout.Toggle("Org", isOrganization.Value, GUILayout.MaxWidth(200));
+
+            EditorGUILayout.EndHorizontal();
+            EditorGUILayout.BeginHorizontal();
+            token.Value = EditorGUILayout.TextField("Token", token.Value, GUILayout.MinWidth(600));
+            if (GUILayout.Button("Get Token"))
+            {
+                Tokens.GetToken(t => token.Value = t);
+            }
+
+            EditorGUILayout.EndHorizontal();
+
+            TokenSecurityAdvice.DrawHelpBox();
 
             GUILayout.Space(4);
-
 
             if (packages.Count > 0)
             {
@@ -44,8 +66,7 @@ namespace PackagesList
             {
                 if (GUILayout.Button("Fetch Packages"))
                 {
-                    packages.Clear();
-                    Fetch();
+                    FetchPackages();
                 }
             }
 
@@ -55,36 +76,29 @@ namespace PackagesList
             GUILayout.Space(4);
         }
 
-        void HandleUserName()
+        async void FetchPackages()
         {
-            const string localUserNameStored = "PackagesList.UserName";
-            const string localIsOrgStored = "PackagesList.UserName.IsOrg";
+            packages.Clear();
+            EditorUtility.DisplayProgressBar("Downloading Packages", "Fetching packages from Github", 0.5f);
 
-            EditorGUILayout.BeginHorizontal();
-
-            githubUser = EditorGUILayout.TextField("Github User", githubUser, GUILayout.MinWidth(600));
-            isOrganization = EditorGUILayout.Toggle("Org", isOrganization, GUILayout.MaxWidth(200));
-
-            EditorGUILayout.EndHorizontal();
-
-            EditorGUILayout.BeginHorizontal();
-
-            if (GUILayout.Button("Save User"))
+            try
             {
-                EditorPrefs.SetString(localUserNameStored, githubUser);
-                EditorPrefs.SetBool(localIsOrgStored, isOrganization);
+                var newPackages =
+                    await GithubPackagesRepository.DownloadPackages(token.Value, githubUser.Value,
+                        isOrganization.Value);
+                packages.AddRange(newPackages);
+            }
+            catch (Exception e)
+            {
+                //show error message
+                EditorUtility.DisplayDialog("Error", e.Message, "Ok");
+                Debug.LogException(e);
             }
 
-            if (GUILayout.Button("Load User"))
-            {
-                githubUser = EditorPrefs.GetString(localUserNameStored, githubUser);
-                isOrganization = EditorPrefs.GetBool(localIsOrgStored, isOrganization);
-            }
-
-            EditorGUILayout.EndHorizontal();
+            EditorUtility.ClearProgressBar();
         }
 
-        void DisplayPackages()
+        async void DisplayPackages()
         {
             if (packages.Count == 0)
             {
@@ -92,47 +106,45 @@ namespace PackagesList
                 return;
             }
 
-            var displayPrivates = false;
-
             if (packages.Any(p => p.isPrivate))
             {
-                if (string.IsNullOrEmpty(token))
+                if (string.IsNullOrEmpty(token.Value))
                 {
                     EditorGUILayout.LabelField("<<There are private packages, please enter your token>>");
                     if (GUILayout.Button("Get Token"))
                     {
-                        Tokens.GetToken(t => token = t);
+                        token.Value = await Tokens.GetTokenAsync();
                         return;
                     }
                 }
-                else
-                {
-                    displayPrivates = true;
-                }
             }
 
-
-            Render(displayPrivates);
+            Render();
         }
 
-        void Render(bool displayPrivates)
+        void DrawSeparator() => GUILayout.Box("", GUILayout.ExpandWidth(true), GUILayout.Height(1));
+
+        void Render()
         {
             using var scrollView = new EditorGUILayout.ScrollViewScope(scroll);
-            foreach (var package in packages)
+
+            DrawSeparator();
+            for (var i = 0; i < packages.Count; i++)
             {
-                if (package.isPrivate && !displayPrivates) continue;
-
-                var suffix = package.isPrivate ? "(private) " + "" : "";
-
+                var package = packages[i];
                 EditorGUILayout.BeginHorizontal();
 
 
-                EditorGUILayout.LabelField(package.name + suffix);
+                EditorGUILayout.LabelField(package.name);
+
+                EditorGUILayout.LabelField(package.isPrivate ? "Private" : "       ", EditorStyles.miniLabel);
+
 
                 if (GUILayout.Button("View On Github"))
                 {
                     Application.OpenURL(package.url);
                 }
+
 
                 if (GUILayout.Button("Copy UPM Url"))
                 {
@@ -143,110 +155,16 @@ namespace PackagesList
 
 
                 EditorGUILayout.EndHorizontal();
+
+                DrawSeparator();
             }
 
             scroll = scrollView.scrollPosition;
         }
-
-        Vector2 scroll;
-
-        async void Fetch()
-        {
-            var webClient = new WebClient();
-            webClient.Headers.Add("User-Agent", "UnityWebRequest");
-
-            var url = PrepareWebClient(webClient);
-
-            try
-            {
-                var json = await webClient.DownloadStringTaskAsync(url);
-                LogJson(json);
-                var repositories = JsonHelper.FromJson<RepositoryDto>(json);
-                packages.Clear();
-
-                foreach (var repository in repositories)
-                {
-                    var package = new PackageInfo
-                    {
-                        name = repository.name,
-                        url = repository.html_url,
-                        urlForUPM = GetUrlForUpm(repository),
-                        isPrivate = repository.@private
-                    };
-
-                    packages.Add(package);
-                }
-            }
-            catch (Exception e)
-            {
-                var error = "Failed to fetch packages: " + e.Message;
-                if (EditorUtility.DisplayDialog("Error", error, "OK"))
-                {
-                    Debug.LogError(error);
-                    Debug.LogException(e);
-                }
-            }
-        }
-
-        string PrepareWebClient(WebClient webClient)
-        {
-            var auth = !string.IsNullOrEmpty(token);
-            if (auth)
-            {
-                webClient.Headers.Add("Authorization", "token " + token);
-                if (isOrganization)
-                {
-                    return $"https://api.github.com/orgs/{githubUser}/repos";
-                }
-            }
-
-            var orgOrUser = isOrganization ? "orgs" : "users";
-            return $"https://api.github.com/{orgOrUser}/{githubUser}/repos";
-        }
-
-
-        static void LogJson(string json)
-        {
-            //copy json to clipboard to debug in another place
-            EditorGUIUtility.systemCopyBuffer = $"START\n{json}\n END!";
-        }
-
-        string GetUrlForUpm(RepositoryDto repoDto) => repoDto.@private
-            ? $"https://x-access-token:{token}@github.com/{githubUser}/{repoDto.name}.git#{repoDto.default_branch}"
-            : $"{repoDto.html_url}.git#{repoDto.default_branch}";
     }
 
-    [Serializable]
-    struct RepositoryDto
+    public static class StringEditorExtensions
     {
-        public string name;
-        public string html_url;
-        public string default_branch;
-        public bool @private;
-    }
-
-    [Serializable]
-    public struct PackageInfo
-    {
-        public string name;
-        public string url;
-        public string urlForUPM;
-        public bool isPrivate;
-    }
-
-    public static class JsonHelper
-    {
-        public static T[] FromJson<T>(string json)
-        {
-            string fixedJson = "{\"repositories\":" + json + "}";
-            Wrapper<T> wrapper = JsonUtility.FromJson<Wrapper<T>>(fixedJson);
-            return wrapper.repositories;
-        }
-
-        [Serializable]
-        private class Wrapper<T>
-        {
-            public T[] repositories;
-        }
+        public static void DrawHelpBox(this string text) => EditorGUILayout.HelpBox(text, MessageType.Info);
     }
 }

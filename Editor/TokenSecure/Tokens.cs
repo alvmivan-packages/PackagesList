@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Threading.Tasks;
 
 namespace PackagesList.TokenSecure
 {
@@ -14,6 +15,16 @@ namespace PackagesList.TokenSecure
             {
                 onGetToken.Invoke(TokenManagement.TokenCache);
             }
+        }
+
+        //async version
+        public static async Task<string> GetTokenAsync(bool forceDrawGUI = false)
+        {
+            var tcs = new TaskCompletionSource<string>();
+
+            GetToken(t => tcs.SetResult(t), forceDrawGUI);
+
+            return await tcs.Task;
         }
     }
 }
