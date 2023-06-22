@@ -19,6 +19,11 @@ However, it's important to remember that you should still follow good security p
 Only enable 'repo' permissions, rotate it regularly, never share it, and revoke it if you suspect it's compromised. 
 Keeping these practices, along with the security measures we implement, will ensure the protection of your GitHub data and resources.";
 
+
+        const string PrivateLabelContent = "Private";
+        const string PublicLabelContent = "       ";
+
+
         Vector2 scroll;
 
         readonly IField<string> token = new InMemoryField<string>();
@@ -37,19 +42,18 @@ Keeping these practices, along with the security measures we implement, will ens
         void OnGUI()
         {
             EditorGUILayout.BeginHorizontal();
-
             githubUser.Value = EditorGUILayout.TextField("Github User", githubUser.Value, GUILayout.MinWidth(600));
             isOrganization.Value = EditorGUILayout.Toggle("Org", isOrganization.Value, GUILayout.MaxWidth(200));
-
             EditorGUILayout.EndHorizontal();
+
+            DrawSeparator();
+
             EditorGUILayout.BeginHorizontal();
             token.Value = EditorGUILayout.TextField("Token", token.Value, GUILayout.MinWidth(600));
-            if (GUILayout.Button("Get Token"))
-            {
-                Tokens.GetToken(t => token.Value = t);
-            }
-
+            GetTokenButton();
             EditorGUILayout.EndHorizontal();
+
+            DrawSeparator();
 
             TokenSecurityAdvice.DrawHelpBox();
 
@@ -70,10 +74,17 @@ Keeping these practices, along with the security measures we implement, will ens
                 }
             }
 
-            GUILayout.Space(2);
-            DisplayPackages();
+            DrawSeparator();
 
-            GUILayout.Space(4);
+            DisplayPackages();
+        }
+
+        async void GetTokenButton()
+        {
+            if (GUILayout.Button("Get Token"))
+            {
+                token.Value = await Tokens.GetTokenAsync();
+            }
         }
 
         async void FetchPackages()
@@ -98,68 +109,61 @@ Keeping these practices, along with the security measures we implement, will ens
             EditorUtility.ClearProgressBar();
         }
 
-        async void DisplayPackages()
+        void DisplayPackages()
         {
             if (packages.Count == 0)
             {
-                EditorGUILayout.HelpBox("No packages found", MessageType.Info);
+                "NoPackagesFound".DrawHelpBox();
                 return;
-            }
-
-            if (packages.Any(p => p.isPrivate))
-            {
-                if (string.IsNullOrEmpty(token.Value))
-                {
-                    EditorGUILayout.LabelField("<<There are private packages, please enter your token>>");
-                    if (GUILayout.Button("Get Token"))
-                    {
-                        token.Value = await Tokens.GetTokenAsync();
-                        return;
-                    }
-                }
             }
 
             Render();
         }
 
-        void DrawSeparator() => GUILayout.Box("", GUILayout.ExpandWidth(true), GUILayout.Height(1));
+        static void DrawSeparator()
+        {
+            GUILayout.Space(1);
+            GUILayout.Box(string.Empty, GUILayout.ExpandWidth(true), GUILayout.Height(1));
+            GUILayout.Space(1);
+        }
 
         void Render()
         {
             using var scrollView = new EditorGUILayout.ScrollViewScope(scroll);
 
+            const int itemsPaddingSides = 2;
             DrawSeparator();
-            for (var i = 0; i < packages.Count; i++)
+            foreach (var package in packages)
             {
-                var package = packages[i];
                 EditorGUILayout.BeginHorizontal();
-
-
-                EditorGUILayout.LabelField(package.name);
-
-                EditorGUILayout.LabelField(package.isPrivate ? "Private" : "       ", EditorStyles.miniLabel);
-
-
-                if (GUILayout.Button("View On Github"))
-                {
-                    Application.OpenURL(package.url);
-                }
-
-
-                if (GUILayout.Button("Copy UPM Url"))
-                {
-                    EditorGUIUtility.systemCopyBuffer = package.urlForUPM;
-                    //Open the package manager window
-                    EditorApplication.ExecuteMenuItem("Window/Package Manager");
-                }
-
-
+                GUILayout.Space(itemsPaddingSides);
+                DrawPackageRow(package);
+                GUILayout.Space(itemsPaddingSides);
                 EditorGUILayout.EndHorizontal();
-
                 DrawSeparator();
             }
 
             scroll = scrollView.scrollPosition;
+        }
+
+        static void DrawPackageRow(PackageInfo package)
+        {
+            var visibilityLabel = package.isPrivate ? PrivateLabelContent : PublicLabelContent;
+            
+            EditorGUILayout.LabelField(package.name);
+            EditorGUILayout.LabelField(visibilityLabel, EditorStyles.miniLabel);
+
+            if (GUILayout.Button("View On Github"))
+            {
+                Application.OpenURL(package.url);
+            }
+
+            if (GUILayout.Button("Copy UPM Url"))
+            {
+                EditorGUIUtility.systemCopyBuffer = package.urlForUPM;
+                //Open the package manager window
+                EditorApplication.ExecuteMenuItem("Window/Package Manager");
+            }
         }
     }
 
