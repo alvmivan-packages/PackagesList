@@ -5,8 +5,14 @@ namespace PackagesList.TokenSecure
 {
     public static class Tokens
     {
-        public static void GetToken(Action<string> onGetToken, bool forceDrawGUI = false)
+        static void GetToken(Action<string> onGetToken, bool forceDrawGUI = false)
         {
+            if (TokenProjectStorage.TryGetFromLocalStorageToken(out var myToken))
+            {
+                onGetToken.Invoke(myToken);
+                return;
+            }
+
             if (string.IsNullOrEmpty(TokenManagement.TokenCache) || forceDrawGUI)
             {
                 TokenManagementView.GetToken(onGetToken);

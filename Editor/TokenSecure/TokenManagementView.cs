@@ -1,4 +1,5 @@
 ﻿using System;
+using PackagesList.CustomStorage;
 using UnityEditor;
 using UnityEngine;
 
@@ -49,10 +50,17 @@ namespace PackagesList.TokenSecure
             }
             else
             {
-                if (GUILayout.Button("Save Token"))
+                EditorGUILayout.BeginHorizontal();
+                if (GUILayout.Button("Store Secure"))
                 {
                     PasswordWindow.GetPassword(OnPasswordEnteredForSave);
                 }
+
+                if (GUILayout.Button("Store Locally"))
+                {
+                    TokenProjectStorage.SetToken(Token);
+                }
+                EditorGUILayout.EndHorizontal();
             }
 
             if (GUILayout.Button("Clear Token"))
