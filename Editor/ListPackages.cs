@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using PackagesList.TokenManagement;
 using PackagesList.TokenSecure;
 using UnityEditor;
 using UnityEngine;
@@ -54,6 +55,9 @@ Keeping these practices, along with the security measures we implement, will ens
             TokenSecurityAdvice.DrawHelpBox();
 
             GUILayout.Space(4);
+            RefreshTokenButton();
+            GUILayout.Space(4);
+            DrawSeparator();
 
             if (packages.Count > 0)
             {
@@ -81,9 +85,21 @@ Keeping these practices, along with the security measures we implement, will ens
             {
                 token.Value = await Tokens.GetTokenAsync();
             }
-            if(GUILayout.Button("New Token"))
+
+            if (GUILayout.Button("New Token"))
             {
                 Tokens.OpenTokenPage();
+            }
+        }
+
+        void RefreshTokenButton()
+        {
+            if (!string.IsNullOrEmpty(token.Value))
+            {
+                if (GUILayout.Button("Refresh token into packages"))
+                {
+                    CurrentTokenUpdate.UpdateCurrentToken(token.Value);
+                }
             }
         }
 
@@ -149,7 +165,7 @@ Keeping these practices, along with the security measures we implement, will ens
         static void DrawPackageRow(PackageInfo package)
         {
             var visibilityLabel = package.isPrivate ? PrivateLabelContent : PublicLabelContent;
-            
+
             EditorGUILayout.LabelField(package.name);
             EditorGUILayout.LabelField(visibilityLabel, EditorStyles.miniLabel);
 
