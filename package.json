@@ -1,7 +1,7 @@
 {
             "name": "com.orbitar.packageslist",
-            "author": "Marcos Alvarez <alvmivan@gmail.com>",
-            "version": "0.0.1",
+            "author": "Marcos Alvarez",
+            "version": "0.0.2",
             "displayName": "PackagesList",
             "description": "",
             "unity": "2021.3",
