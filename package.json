@@ -1,9 +1,12 @@
 {
-            "name": "com.orbitar.packageslist",
-            "author": "Marcos Alvarez",
-            "version": "0.0.2",
-            "displayName": "PackagesList",
-            "description": "",
-            "unity": "2021.3",
-            "dependencies": {}
-        }
+  "name": "com.orbitar.packageslist",
+  "author": {
+    "name": "Marcos Alvarez",
+    "email": "alvmivan@gmail.com"
+  },
+  "version": "0.0.3",
+  "displayName": "PackagesList",
+  "description": "",
+  "unity": "2021.3",
+  "dependencies": {}
+}
