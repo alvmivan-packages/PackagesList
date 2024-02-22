@@ -1,6 +1,5 @@
 using System;
-using System.Collections.Generic;
-using PackagesList.SSH;
+using System.Collections.Generic; 
 using PackagesList.TokenManagement;
 using PackagesList.TokenSecure;
 using UnityEditor;
@@ -50,7 +49,7 @@ Keeping these practices, along with the security measures we implement, will ens
             EditorGUILayout.BeginHorizontal();
             token.Value = EditorGUILayout.TextField("Token", token.Value, GUILayout.MinWidth(600));
             GetTokenButton();
-            CheckSshButton();
+
             EditorGUILayout.EndHorizontal();
 
             DrawSeparator();
@@ -82,14 +81,6 @@ Keeping these practices, along with the security measures we implement, will ens
             DisplayPackages();
         }
 
-        async void CheckSshButton()
-        {
-            if (GUILayout.Button("Check SSH"))
-            {
-                var sshSetup = await SSHManagement.HasSSHSetup();
-                Debug.Log("SSH Setup : " + sshSetup);
-            }
-        }
 
         async void GetTokenButton()
         {
@@ -186,11 +177,18 @@ Keeping these practices, along with the security measures we implement, will ens
                 Application.OpenURL(package.url);
             }
 
-            if (GUILayout.Button("Copy UPM Url"))
+            // if (GUILayout.Button("Copy UPM Url"))
+            // {
+            //     EditorGUIUtility.systemCopyBuffer = package.urlForUPM;
+            //     //Open the package manager window
+            //     EditorApplication.ExecuteMenuItem("Window/Package Manager");
+            // }
+            
+            if (GUILayout.Button("Install Package"))
             {
                 EditorGUIUtility.systemCopyBuffer = package.urlForUPM;
-                //Open the package manager window
-                EditorApplication.ExecuteMenuItem("Window/Package Manager");
+                
+                
             }
         }
     }
