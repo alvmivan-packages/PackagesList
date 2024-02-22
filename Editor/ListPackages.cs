@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using PackagesList.SSH;
 using PackagesList.TokenManagement;
 using PackagesList.TokenSecure;
 using UnityEditor;
@@ -19,6 +20,7 @@ Keeping these practices, along with the security measures we implement, will ens
 
         const string PrivateLabelContent = "Private";
         const string PublicLabelContent = "       ";
+        const string CompanyName = "Orbitar";
 
 
         Vector2 scroll;
@@ -28,7 +30,7 @@ Keeping these practices, along with the security measures we implement, will ens
         readonly IField<bool> isOrganization = new EditorPrefsBoolField("PackagesList.UserName.IsOrg");
         readonly List<PackageInfo> packages = new();
 
-        [MenuItem("Orbitar/Packages/List")]
+        [MenuItem(CompanyName + "/Packages/List")]
         public static void ShowWindow()
         {
             var window = GetWindow<ListPackages>(false, "Packages List");
@@ -48,6 +50,7 @@ Keeping these practices, along with the security measures we implement, will ens
             EditorGUILayout.BeginHorizontal();
             token.Value = EditorGUILayout.TextField("Token", token.Value, GUILayout.MinWidth(600));
             GetTokenButton();
+            CheckSshButton();
             EditorGUILayout.EndHorizontal();
 
             DrawSeparator();
@@ -77,6 +80,15 @@ Keeping these practices, along with the security measures we implement, will ens
             DrawSeparator();
 
             DisplayPackages();
+        }
+
+        async void CheckSshButton()
+        {
+            if (GUILayout.Button("Check SSH"))
+            {
+                var sshSetup = await SSHManagement.HasSSHSetup();
+                Debug.Log("SSH Setup : " + sshSetup);
+            }
         }
 
         async void GetTokenButton()

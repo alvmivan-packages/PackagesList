@@ -1,28 +1,18 @@
 ﻿using System;
-using System.Net.Http;
-using System.Net.Http.Headers;
-using System.Text;
+using System.Collections.Generic;
+using System.Diagnostics;
 using System.Threading.Tasks;
 using UnityEngine;
-using Unity.Plastic.Newtonsoft.Json;
+using Debug = UnityEngine.Debug;
 
 namespace PackagesList
 {
-    public static class GithubTools
+    public class GithubConnectionValidation
     {
-        static readonly HttpClient HttpClient = new()
-        {
-            DefaultRequestHeaders =
-            {
-                UserAgent = { ProductInfoHeaderValue.Parse("PackagesList/0.2") }
-            }
-        };
+        readonly string findFileArguments;
+        readonly string connectRepoArguments;
 
-        const string JsonMediaType = "application/json";
-        const string GithubGraphQLURL = "https://api.github.com/graphql";
-
-
-        public static async Task<bool> HasFile(string packageURL, string packageBranch, string token,
+        public GithubConnectionValidation(string packageURL, string packageBranch, string token,
             string fileYouAreLookingFor)
         {
             var uri = new Uri(packageURL);
@@ -30,70 +20,113 @@ namespace PackagesList
             var githubUser = pathSegments[1];
             var packageName = pathSegments[2];
 
-            var query = CreateQuery(githubUser, packageName, packageBranch, fileYouAreLookingFor);
-            var jsonQuery = JsonConvert.SerializeObject(new { query });
+            var isUsingSsh = string.IsNullOrEmpty(token);
 
-            var content = new StringContent(jsonQuery, Encoding.UTF8, JsonMediaType);
+            var repositoryPath = isUsingSsh
+                ? $"{githubUser}/{packageName}.git"
+                : $"{githubUser}/{packageName}";
 
-            PrepareToken(token);
+            var expression = $"{packageBranch}:{fileYouAreLookingFor}";
 
-            try
-            {
-                var response = await HttpClient.PostAsync(GithubGraphQLURL, content);
-                response.EnsureSuccessStatusCode();
+            findFileArguments = isUsingSsh
+                ? $"ls-remote git@github.com:{repositoryPath} {expression}"
+                : $"ls-remote https://github.com/{repositoryPath} {expression}";
 
-                var responseContent = await response.Content.ReadAsStringAsync();
-                var graphQlResponse = JsonConvert.DeserializeObject<GraphQlResponse>(responseContent);
-
-                // Verifica si Repository es null antes de intentar acceder a Object
-                return graphQlResponse.Data?.Repository?.Object != null;
-            }
-            catch (Exception e)
-            {
-                Debug.LogException(e);
-                return false;
-            }
+            connectRepoArguments = isUsingSsh
+                ? $"ls-remote git@github.com:{repositoryPath}"
+                : $"ls-remote https://github.com/{repositoryPath}";
         }
 
-        static void PrepareToken(string token)
+        public async Task<bool> CanFindFile()
         {
-            HttpClient.DefaultRequestHeaders.Authorization =
-                new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token);
+            // Use SSH command to check if the file exists
+
+            var processStartInfo = new ProcessStartInfo
+            {
+                FileName = "git",
+                Arguments = findFileArguments,
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                UseShellExecute = false,
+                CreateNoWindow = true
+            };
+
+
+            Debug.Log("Command to run is " + processStartInfo.FileName + " " + processStartInfo.Arguments);
+
+            using var process = new Process();
+            process.StartInfo = processStartInfo;
+            process.Start();
+            process.WaitForExit();
+
+            await process.StandardOutput.ReadToEndAsync();
+            await process.StandardError.ReadToEndAsync();
+
+            return process.ExitCode == 0;
         }
 
-        static string CreateQuery(string githubUser, string packageName, string packageBranch,
+        public async Task<(bool can, string reason)> CanConnectToRepo()
+        {
+            // Use SSH command to check if the file exists
+
+            var processStartInfo = new ProcessStartInfo
+            {
+                FileName = "git",
+                Arguments = connectRepoArguments,
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                UseShellExecute = false,
+                CreateNoWindow = true
+            };
+
+            Debug.Log("Command to run is " + processStartInfo.FileName + " " + processStartInfo.Arguments);
+
+            using var process = new Process();
+            process.StartInfo = processStartInfo;
+            process.Start();
+            process.WaitForExit();
+
+            await process.StandardOutput.ReadToEndAsync();
+            var error = await process.StandardError.ReadToEndAsync();
+
+            return (process.ExitCode == 0, error);
+        }
+    }
+
+
+    public static class GithubTools
+    {
+        //dictionary repo->bool to catch canConnect results
+        static readonly Dictionary<string, bool> CanConnectResults = new();
+
+        public static async Task<bool> HasFile(string packageURL, string packageBranch, string token,
             string fileYouAreLookingFor)
         {
-            return @"query { 
-                    repository(owner: """ + githubUser + @""", name: """ + packageName + @""") {
-                        object(expression: """ + packageBranch + $@":{fileYouAreLookingFor}"") {{
-                            ... on Blob {{
-                                id
-                            }}
-                        }}
-                    }}
-                }}";
+            var validation = new GithubConnectionValidation(
+                packageURL,
+                packageBranch,
+                token,
+                fileYouAreLookingFor
+            );
+
+
+            //write can  connect if cache
+            if (CanConnectResults.TryGetValue(packageURL, out var canConnectCache))
+            {
+                return canConnectCache && await validation.CanFindFile();
+            }
+
+            var (canConnect, cantConnectReason) = await validation.CanConnectToRepo();
+
+            if (canConnect)
+            {
+                CanConnectResults[packageURL] = true;
+                return await validation.CanFindFile();
+            }
+
+            CanConnectResults[packageURL] = false;
+            Debug.LogError("error connecting to repo: " + cantConnectReason);
+            return false;
         }
-    }
-
-
-    public class GraphQlResponse
-    {
-        public Data Data { get; set; }
-    }
-
-    public class Data
-    {
-        public Repository Repository { get; set; }
-    }
-
-    public class Repository
-    {
-        public Blob Object { get; set; }
-    }
-
-    public class Blob
-    {
-        public string Id { get; set; }
     }
 }

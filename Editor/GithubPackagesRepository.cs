@@ -35,29 +35,25 @@ namespace PackagesList
             webClient.Headers.Add("User-Agent", "UnityWebRequest");
 
             var url = PrepareWebClient(webClient);
-            try
-            {
-                var json = await webClient.DownloadStringTaskAsync(url);
+
+            var json = await webClient.DownloadStringTaskAsync(url);
+
+            var fromJson = JsonHelper.FromJson<RepositoryDto>(json);
+
+            if (fromJson.Length == 0) return new List<PackageInfo>();
+
+            Debug.Log(fromJson.Length + " repositories found " + json);
+
+            var list = fromJson.Select(ToPackageInfo).ToList();
 
 
-                var list = JsonHelper.FromJson<RepositoryDto>(json).Select(ToPackageInfo).ToList();
+            var validations = list.Select(IsThisAPackage).ToArray();
 
-                // is this a package
+            var results = await Task.WhenAll(validations);
 
-                var validations = list.Select(IsThisAPackage).ToArray();
+            list = list.Where((_, i) => results[i]).ToList();
 
-                var results = await Task.WhenAll(validations);
-
-                list = list.Where((_, i) => results[i]).ToList();
-
-                return list;
-            }
-            catch (Exception e)
-            {
-                // Debug.LogException(e);
-                Debug.LogError("trying : " + url + " \nError : \n" + e.Message);
-                throw;
-            }
+            return list;
         }
 
         string GetUrlForUpm(RepositoryDto repoDto) => repoDto.@private
@@ -78,14 +74,24 @@ namespace PackagesList
                     return $"https://api.github.com/orgs/{githubUser}/repos";
                 }
             }
+            //
+            // var orgOrUser = isOrganization ? "orgs" : "users";
+            // return $"https://api.github.com/{orgOrUser}/{githubUser}/repos";
 
-            var orgOrUser = isOrganization ? "orgs" : "users";
-            return $"https://api.github.com/{orgOrUser}/{githubUser}/repos";
+            //use git ssh
+            return $"https://api.github.com/users/{githubUser}/repos";
         }
 
-        async Task<bool> IsThisAPackage(PackageInfo package) =>
-            await GithubTools.HasFile(package.url, package.branch, token, "package.json")
-            && !await GithubTools.HasFile(package.url, package.branch, token, ".ignorePackagesList");
+        async Task<bool> IsThisAPackage(PackageInfo package)
+        {
+            var hasPackageJson = await GithubTools.HasFile(package.url, package.branch, token, "package.json");
+
+
+            Debug.Log($"Result {package.name} hasPackageJson: {hasPackageJson}");
+            Debug.Log("-------------------------------------------------");
+
+            return hasPackageJson;
+        }
 
 
         [Serializable]
