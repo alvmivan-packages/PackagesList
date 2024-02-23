@@ -19,23 +19,39 @@ namespace PackagesList
             "then you must setup it on git, you can do it by running the following command:\n" +
             "git config --global github.token YOUR_TOKEN\n";
 
-        Vector2 scroll;
+        const int ListWidth = 300;
+        const int InspectorWidth = 600;
+        const int ListRowHeight = 20;
+        const int Height = 900;
 
         readonly IField<string> hiddenToken = new InMemoryField<string>();
         readonly IField<string> token = new InMemoryField<string>();
         readonly IField<string> githubUser = new EditorPrefsStringField("PackagesList.UserName");
         readonly IField<bool> isOrganization = new EditorPrefsBoolField("PackagesList.UserName.IsOrg");
 
+
+        readonly PackagesView packagesView = new(ListRowHeight);
+
         [MenuItem(CompanyName + "/Packages/List")]
         public static void ShowWindow()
         {
             var window = GetWindow<ListPackages>(false, "Packages List");
-            window.minSize = new Vector2(900, 700);
+            PackagesView.Deselect();
+            window.minSize = new Vector2(ListWidth, Height);
             window.Show();
         }
 
         void OnGUI()
         {
+            if (PackagesView.GetSelected() is null)
+            {
+                minSize = new Vector2(ListWidth, Height);
+            }
+            else
+            {
+                minSize = new Vector2(ListWidth + InspectorWidth, Height);
+            }
+
             if (string.IsNullOrEmpty(token.Value))
             {
                 DrawTokenField();
@@ -75,7 +91,7 @@ namespace PackagesList
             isOrganization.Value = EditorGUILayout.Toggle("Org", isOrganization.Value, GUILayout.MaxWidth(200));
             EditorGUILayout.EndHorizontal();
 
-            DrawSeparator();
+            EditorViewTools.DrawSeparatorHorizontal();
 
             if (PackagesDatabase.List.Count > 0)
             {
@@ -92,7 +108,7 @@ namespace PackagesList
                 }
             }
 
-            DrawSeparator();
+            EditorViewTools.DrawSeparatorHorizontal();
 
             DisplayPackages();
         }
@@ -105,7 +121,7 @@ namespace PackagesList
             try
             {
                 var newPackages = await GithubPackagesRepository.DownloadPackages(token.Value, githubUser.Value,
-                        isOrganization.Value);
+                    isOrganization.Value);
                 PackagesDatabase.Set(newPackages);
             }
             catch (Exception e)
@@ -126,28 +142,19 @@ namespace PackagesList
                 return;
             }
 
-            RenderList();
-        }
+            EditorGUILayout.BeginHorizontal();
 
-        static void DrawSeparator()
-        {
-            GUILayout.Space(1);
-            GUILayout.Box(string.Empty, GUILayout.ExpandWidth(true), GUILayout.Height(1));
-            GUILayout.Space(1);
-        }
+            EditorGUILayout.BeginVertical(GUILayout.Width(ListWidth));
+            packagesView.RenderList();
+            EditorGUILayout.EndVertical();
 
-        void RenderList()
-        {
-            using var scrollView = new EditorGUILayout.ScrollViewScope(scroll);
+            EditorViewTools.DrawSeparatorVertical();
 
-            DrawSeparator();
-            foreach (var package in PackagesDatabase.List)
-            {
-                PackageDrawer.DrawRow(package);
-                DrawSeparator();
-            }
+            EditorGUILayout.BeginVertical(GUILayout.Width(InspectorWidth));
+            packagesView.RenderInspector();
+            EditorGUILayout.EndVertical();
 
-            scroll = scrollView.scrollPosition;
+            EditorGUILayout.EndHorizontal();
         }
     }
 
