@@ -1,7 +1,7 @@
 ﻿using System;
 using UnityEngine;
 
-namespace PackagesList
+namespace PackagesList.GithubExplorer
 {
     public static class RepositoriesJsonHelper
     {

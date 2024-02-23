@@ -1,7 +1,9 @@
 using System;
 using System.Collections.Generic;
 using PackagesList.Database;
+using PackagesList.GithubExplorer;
 using PackagesList.Tokens;
+using PackagesList.Utilities;
 using PackagesList.View;
 using UnityEditor;
 using UnityEngine;

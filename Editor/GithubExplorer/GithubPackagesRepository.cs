@@ -3,10 +3,9 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Net;
 using System.Threading.Tasks;
-using UnityEditor;
 using UnityEngine;
 
-namespace PackagesList
+namespace PackagesList.GithubExplorer
 {
     public class GithubPackagesRepository
     {
@@ -80,13 +79,6 @@ namespace PackagesList
         }
 
 
-        [Serializable]
-        struct RepositoryDto
-        {
-            public string name;
-            public string html_url;
-            public string default_branch;
-            public bool @private;
-        }
+        
     }
 }

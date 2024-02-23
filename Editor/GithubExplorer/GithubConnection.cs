@@ -1,14 +1,11 @@
-﻿using System;
-using System.Net;
+﻿using System.Net;
 using System.Threading.Tasks;
-using Debug = UnityEngine.Debug;
-using System.Net.Http;
+using UnityEngine;
 
-namespace PackagesList
+namespace PackagesList.GithubExplorer
 {
     public class GithubConnection
     {
-        // https que funciona : https://raw.githubusercontent.com/alvmivan-packages/Injector/master/package.json
         const string FormatHttps = "https://raw.githubusercontent.com/{0}/{1}/{2}";
 
         static string GetHttpUri(string packageURL, string packageBranch, string file) =>
@@ -41,28 +38,6 @@ namespace PackagesList
             }
 
             return await client.DownloadStringTaskAsync(uri);
-        }
-    }
-
-    public static class GithubTools
-    {
-        public static async Task<string> GetFileContent(string packageURL, string packageBranch, string token,
-            string fileYouAreLookingFor)
-        {
-            var validation = new GithubConnection(
-                packageURL,
-                packageBranch,
-                token
-            );
-
-            try
-            {
-                return await validation.GetFileContent(fileYouAreLookingFor);
-            }
-            catch (Exception e)
-            {
-                return null;
-            }
         }
     }
 }
