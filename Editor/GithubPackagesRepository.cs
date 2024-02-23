@@ -36,23 +36,11 @@ namespace PackagesList
         async Task<IReadOnlyList<PackageInfo>> DownloadPackages()
         {
             var json = await webClient.DownloadStringTaskAsync(url);
-
-
             var fromJson = RepositoriesJsonHelper.FromJson<RepositoryDto>(json);
-
             if (fromJson.Length == 0) return new List<PackageInfo>();
-
-            Debug.Log(fromJson.Length + " repositories found " + json);
-
             var list = fromJson.Select(ToPackageInfo).ToList();
-
-
             var packageJsonsTask = list.Select(GetPackageJson).ToArray();
-
-
             var packageJsons = await Task.WhenAll(packageJsonsTask);
-
-
             list = list
                 .Select((package, i) => package.SetPackageInfo(packageJsons[i]))
                 .Where(p => !string.IsNullOrEmpty(p.version))
@@ -70,20 +58,10 @@ namespace PackagesList
 
         string PrepareWebClient()
         {
-            var auth = !string.IsNullOrEmpty(token);
-
             var noAuth = $"https://api.github.com/users/{githubUser}/repos";
-
-            if (!auth) return noAuth;
-
+            if (string.IsNullOrEmpty(token)) return noAuth;
             webClient.Headers.Add("Authorization", "token " + token);
-
-            if (isOrganization)
-            {
-                return $"https://api.github.com/orgs/{githubUser}/repos";
-            }
-
-            return noAuth;
+            return isOrganization ? $"https://api.github.com/orgs/{githubUser}/repos" : noAuth;
         }
 
 
