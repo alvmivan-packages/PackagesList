@@ -1,94 +1,68 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Diagnostics;
+using System.Net;
 using System.Threading.Tasks;
-using UnityEngine;
 using Debug = UnityEngine.Debug;
+using System.Net.Http;
 
 namespace PackagesList
 {
-    public class GithubConnectionValidation
+    public class GithubConnection
     {
-        const string GithubUriSshPrefix = "git@github.com:";
-        const string GithubUriHttpsPrefix = "https://github.com/";
-        const string GitListCommandArguments = "ls-remote";
-        const string GitPathSshSuffix = ".git";
+        // https que funciona : https://raw.githubusercontent.com/alvmivan-packages/Injector/master/package.json
+        const string FormatHttps = "https://raw.githubusercontent.com/{0}/{1}/{2}";
 
-        readonly string findFileArguments;
-        readonly string connectRepoArguments;
+        static string GetHttpUri(string packageURL, string packageBranch, string file) =>
+            string.Format(FormatHttps, packageURL, packageBranch, file);
 
-        public GithubConnectionValidation(string packageURL, string packageBranch, string token,
-            string fileYouAreLookingFor)
+
+        readonly string packageURL;
+        readonly string packageBranch;
+        readonly string token;
+
+        public GithubConnection(string packageURL, string packageBranch, string token)
         {
-            var uri = new Uri(packageURL);
-            var pathSegments = uri.AbsolutePath.Split('/');
-            var githubUser = pathSegments[1];
-            var packageName = pathSegments[2];
-            var isUsingSsh = string.IsNullOrEmpty(token);
-
-            var repositoryPath =
-                isUsingSsh ? $"{githubUser}/{packageName}{GitPathSshSuffix}" : $"{githubUser}/{packageName}";
-
-            var fileExpression = $"{packageBranch}:{fileYouAreLookingFor}";
-            var githubUriPrefix = isUsingSsh ? GithubUriSshPrefix : GithubUriHttpsPrefix;
-            connectRepoArguments = $"{GitListCommandArguments} {githubUriPrefix}{repositoryPath}";
-            findFileArguments = connectRepoArguments + " " + fileExpression;
+            this.packageURL = packageURL;
+            this.packageBranch = packageBranch;
+            this.token = token;
         }
 
-        static ProcessStartInfo GitCommand(string arguments) => new()
+        string GetUri(string file) => GetHttpUri(packageURL, packageBranch, file);
+
+
+        public async Task<string> GetFileContent(string file)
         {
-            FileName = "git",
-            Arguments = arguments,
-            RedirectStandardOutput = true,
-            RedirectStandardError = true,
-            UseShellExecute = false,
-            CreateNoWindow = true
-        };
+            var uri = GetUri(file);
+            Debug.Log("uri is " + uri);
+            using var client = new WebClient();
+            client.Headers.Add("User-Agent", "UnityWebRequest");
+            if (!string.IsNullOrEmpty(token))
+            {
+                client.Headers.Add("Authorization", "token " + token);
+            }
 
-        public Task<bool> CanFindFile() => RunProcess(GitCommand(findFileArguments));
-
-        public Task<bool> CanConnectToRepo() => RunProcess(GitCommand(connectRepoArguments));
-
-        static async Task<bool> RunProcess(ProcessStartInfo processInfo)
-        {
-            using var process = new Process();
-            process.StartInfo = processInfo;
-            process.Start();
-            process.WaitForExit();
-            await Task.Yield();
-            return process.ExitCode == 0;
+            return await client.DownloadStringTaskAsync(uri);
         }
     }
 
-
     public static class GithubTools
     {
-        static readonly Dictionary<string, bool> CanConnectResults = new();
-
-        public static async Task<bool> HasFile(string packageURL, string packageBranch, string token,
+        public static async Task<string> GetFileContent(string packageURL, string packageBranch, string token,
             string fileYouAreLookingFor)
         {
-            var validation = new GithubConnectionValidation(
+            var validation = new GithubConnection(
                 packageURL,
                 packageBranch,
-                token,
-                fileYouAreLookingFor
+                token
             );
-            
-            if (CanConnectResults.TryGetValue(packageURL, out var canConnectCache))
-            {
-                return canConnectCache && await validation.CanFindFile();
-            }
 
-            if (await validation.CanConnectToRepo())
+            try
             {
-                CanConnectResults[packageURL] = true;
-                return await validation.CanFindFile();
+                return await validation.GetFileContent(fileYouAreLookingFor);
             }
-
-            CanConnectResults[packageURL] = false;
-            Debug.LogError("error connecting to repo: " + packageURL);
-            return false;
+            catch (Exception e)
+            {
+                return null;
+            }
         }
     }
 }

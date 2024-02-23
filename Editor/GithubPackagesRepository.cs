@@ -2,9 +2,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Net;
-using System.Net.Http;
 using System.Threading.Tasks;
-using UnityEditor;
 using UnityEngine;
 
 namespace PackagesList
@@ -19,6 +17,8 @@ namespace PackagesList
         readonly string token;
         readonly string githubUser;
         readonly bool isOrganization;
+        readonly WebClient webClient;
+        readonly string url;
 
 
         GithubPackagesRepository(string token, string githubUser, bool isOrganization)
@@ -26,17 +26,16 @@ namespace PackagesList
             this.token = token;
             this.githubUser = githubUser;
             this.isOrganization = isOrganization;
+            webClient = new WebClient();
+            webClient.Headers.Add("User-Agent", "UnityWebRequest");
+            url = PrepareWebClient();
         }
 
 
         async Task<IReadOnlyList<PackageInfo>> DownloadPackages()
         {
-            var webClient = new WebClient();
-            webClient.Headers.Add("User-Agent", "UnityWebRequest");
-
-            var url = PrepareWebClient(webClient);
-
             var json = await webClient.DownloadStringTaskAsync(url);
+
 
             var fromJson = JsonHelper.FromJson<RepositoryDto>(json);
 
@@ -47,11 +46,15 @@ namespace PackagesList
             var list = fromJson.Select(ToPackageInfo).ToList();
 
 
-            var validations = list.Select(IsThisAPackage).ToArray();
+            var packageJsonsTask = list.Select(GetPackageJson).ToArray();
 
-            var results = await Task.WhenAll(validations);
 
-            list = list.Where((_, i) => results[i]).ToList();
+            var packageJsons = await Task.WhenAll(packageJsonsTask);
+
+            list = list
+                .Select((package, i) => package.SetPackageInfo(packageJsons[i]))
+                .Where(p => !string.IsNullOrEmpty(p.version))
+                .ToList();
 
             return list;
         }
@@ -63,34 +66,37 @@ namespace PackagesList
         PackageInfo ToPackageInfo(RepositoryDto repository) => new(repository.name, repository.html_url,
             GetUrlForUpm(repository), repository.@private, repository.default_branch);
 
-        string PrepareWebClient(WebClient webClient)
+        string PrepareWebClient()
         {
             var auth = !string.IsNullOrEmpty(token);
-            if (auth)
-            {
-                webClient.Headers.Add("Authorization", "token " + token);
-                if (isOrganization)
-                {
-                    return $"https://api.github.com/orgs/{githubUser}/repos";
-                }
-            }
-            //
-            // var orgOrUser = isOrganization ? "orgs" : "users";
-            // return $"https://api.github.com/{orgOrUser}/{githubUser}/repos";
 
-            //use git ssh
-            return $"https://api.github.com/users/{githubUser}/repos";
+            var noAuth = $"https://api.github.com/users/{githubUser}/repos";
+
+            if (!auth) return noAuth;
+
+            webClient.Headers.Add("Authorization", "token " + token);
+
+            if (isOrganization)
+            {
+                return $"https://api.github.com/orgs/{githubUser}/repos";
+            }
+
+            return noAuth;
         }
 
-        async Task<bool> IsThisAPackage(PackageInfo package)
+
+        async Task<string> GetPackageJson(PackageInfo package)
         {
-            var hasPackageJson = await GithubTools.HasFile(package.url, package.branch, token, "package.json");
+            try
+            {
+                return await GithubTools.GetFileContent(package.innerUrl, package.branch, token, "package.json");
+            }
+            catch (Exception e)
+            {
+                Debug.LogException(e);
+            }
 
-
-            Debug.Log($"Result {package.name} hasPackageJson: {hasPackageJson}");
-            Debug.Log("-------------------------------------------------");
-
-            return hasPackageJson;
+            return string.Empty;
         }
 
 

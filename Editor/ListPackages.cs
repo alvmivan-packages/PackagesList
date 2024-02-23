@@ -1,7 +1,7 @@
 using System;
-using System.Collections.Generic; 
-using PackagesList.TokenManagement;
-using PackagesList.TokenSecure;
+using System.Collections.Generic;
+using PackagesList.Tokens;
+using PackagesList.View;
 using UnityEditor;
 using UnityEngine;
 
@@ -9,21 +9,16 @@ namespace PackagesList
 {
     public class ListPackages : EditorWindow
     {
-        const string TokenSecurityAdvice = @"Your GitHub token is vital for the security of your data. 
-When you provide your token to our application, we internally encrypt it with a password before storing it. 
-This extra step of security means that even if someone manages to access the application's database, they won't be able to use your token as it will be encrypted.
-However, it's important to remember that you should still follow good security practices with your token. 
-Only enable 'repo' permissions, rotate it regularly, never share it, and revoke it if you suspect it's compromised. 
-Keeping these practices, along with the security measures we implement, will ensure the protection of your GitHub data and resources.";
-
-
-        const string PrivateLabelContent = "Private";
-        const string PublicLabelContent = "       ";
         const string CompanyName = "Orbitar";
 
+        const string TokenInfo =
+            "You can generate a token on github, then you need to setup the token on your command line\n" +
+            "then you must setup it on git, you can do it by running the following command:\n" +
+            "git config --global github.token YOUR_TOKEN\n";
 
         Vector2 scroll;
 
+        readonly IField<string> hiddenToken = new InMemoryField<string>();
         readonly IField<string> token = new InMemoryField<string>();
         readonly IField<string> githubUser = new EditorPrefsStringField("PackagesList.UserName");
         readonly IField<bool> isOrganization = new EditorPrefsBoolField("PackagesList.UserName.IsOrg");
@@ -39,26 +34,48 @@ Keeping these practices, along with the security measures we implement, will ens
 
         void OnGUI()
         {
+            if (string.IsNullOrEmpty(token.Value))
+            {
+                DrawTokenField();
+            }
+            else
+            {
+                DrawRegularWindow();
+            }
+        }
+
+        async void DrawTokenField()
+        {
+            EditorGUILayout.LabelField("Token is required to fetch packages from Github");
+
+            //you can find your token here : [button find token] 
+
+
+            if (string.IsNullOrEmpty(hiddenToken.Value))
+            {
+                TokenInfo.DrawHelpBox();
+                if (GUILayout.Button("Find Token", GUILayout.MaxWidth(200)))
+                {
+                    TokenHandler.OpenGithubPageToGenerateAToken();
+                }
+
+                hiddenToken.Value = await TokenHandler.GetToken();
+                return;
+            }
+
+            if (GUILayout.Button("Get Token", GUILayout.MaxWidth(200)))
+            {
+                token.Value = hiddenToken.Value;
+            }
+        }
+
+        void DrawRegularWindow()
+        {
             EditorGUILayout.BeginHorizontal();
             githubUser.Value = EditorGUILayout.TextField("Github User", githubUser.Value, GUILayout.MinWidth(600));
             isOrganization.Value = EditorGUILayout.Toggle("Org", isOrganization.Value, GUILayout.MaxWidth(200));
             EditorGUILayout.EndHorizontal();
 
-            DrawSeparator();
-
-            EditorGUILayout.BeginHorizontal();
-            token.Value = EditorGUILayout.TextField("Token", token.Value, GUILayout.MinWidth(600));
-            GetTokenButton();
-
-            EditorGUILayout.EndHorizontal();
-
-            DrawSeparator();
-
-            TokenSecurityAdvice.DrawHelpBox();
-
-            GUILayout.Space(4);
-            RefreshTokenButton();
-            GUILayout.Space(4);
             DrawSeparator();
 
             if (packages.Count > 0)
@@ -81,30 +98,6 @@ Keeping these practices, along with the security measures we implement, will ens
             DisplayPackages();
         }
 
-
-        async void GetTokenButton()
-        {
-            if (GUILayout.Button("Get Token"))
-            {
-                token.Value = await Tokens.GetTokenAsync();
-            }
-
-            if (GUILayout.Button("New Token"))
-            {
-                Tokens.OpenTokenPage();
-            }
-        }
-
-        void RefreshTokenButton()
-        {
-            if (!string.IsNullOrEmpty(token.Value))
-            {
-                if (GUILayout.Button("Refresh token into packages"))
-                {
-                    CurrentTokenUpdate.UpdateCurrentToken(token.Value);
-                }
-            }
-        }
 
         async void FetchPackages()
         {
@@ -136,7 +129,7 @@ Keeping these practices, along with the security measures we implement, will ens
                 return;
             }
 
-            Render();
+            RenderList();
         }
 
         static void DrawSeparator()
@@ -146,50 +139,18 @@ Keeping these practices, along with the security measures we implement, will ens
             GUILayout.Space(1);
         }
 
-        void Render()
+        void RenderList()
         {
             using var scrollView = new EditorGUILayout.ScrollViewScope(scroll);
 
-            const int itemsPaddingSides = 2;
             DrawSeparator();
             foreach (var package in packages)
             {
-                EditorGUILayout.BeginHorizontal();
-                GUILayout.Space(itemsPaddingSides);
-                DrawPackageRow(package);
-                GUILayout.Space(itemsPaddingSides);
-                EditorGUILayout.EndHorizontal();
+                PackageDrawer.DrawRow(package);
                 DrawSeparator();
             }
 
             scroll = scrollView.scrollPosition;
-        }
-
-        static void DrawPackageRow(PackageInfo package)
-        {
-            var visibilityLabel = package.isPrivate ? PrivateLabelContent : PublicLabelContent;
-
-            EditorGUILayout.LabelField(package.name);
-            EditorGUILayout.LabelField(visibilityLabel, EditorStyles.miniLabel);
-
-            if (GUILayout.Button("View On Github"))
-            {
-                Application.OpenURL(package.url);
-            }
-
-            // if (GUILayout.Button("Copy UPM Url"))
-            // {
-            //     EditorGUIUtility.systemCopyBuffer = package.urlForUPM;
-            //     //Open the package manager window
-            //     EditorApplication.ExecuteMenuItem("Window/Package Manager");
-            // }
-            
-            if (GUILayout.Button("Install Package"))
-            {
-                EditorGUIUtility.systemCopyBuffer = package.urlForUPM;
-                
-                
-            }
         }
     }
 
