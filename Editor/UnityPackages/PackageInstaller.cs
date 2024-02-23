@@ -25,8 +25,6 @@ namespace PackagesList.UnityPackages
 
             return fileInfo;
         }
-
-
         public static bool IsPackageInstalled(PackageInfo package) => !string.IsNullOrEmpty(CurrentVersion(package));
 
         public static void InstallPackage(PackageInfo package)

@@ -6,57 +6,54 @@ namespace PackagesList.View
 {
     public static class PackageDrawer
     {
-        const string PrivateLabelContent = "Private";
-        const string PublicLabelContent = "       ";
+        const string LockResource = "package-lock";
+        const int RowHeight = 22;
+        const int ItemsPaddingSides = 2;
+
+        static readonly GUILayoutOption[] InstalledLabelViewConf = { GUILayout.Width(100) };
+        static readonly GUILayoutOption[] VisibilityLabelViewConf = { GUILayout.Width(14), GUILayout.Height(14) };
+        static readonly GUILayoutOption[] PackageNameLabelViewConf = { GUILayout.Width(250) };
+        static readonly GUILayoutOption[] RowLayoutOptions = { GUILayout.Height(RowHeight) };
 
         public static void DrawRow(PackageInfo package)
         {
-            const int itemsPaddingSides = 2;
-            EditorGUILayout.BeginHorizontal();
-            GUILayout.Space(itemsPaddingSides);
+            EditorGUILayout.BeginHorizontal(RowLayoutOptions);
+            PaddingSides();
             DrawPackageRow(package);
-            GUILayout.Space(itemsPaddingSides);
+            PaddingSides();
             EditorGUILayout.EndHorizontal();
+        }
+
+        static void PaddingSides() => GUILayout.Space(ItemsPaddingSides);
+
+        static GUIContent LockedIcon()
+        {
+            return new GUIContent(Resources.Load<Texture2D>(LockResource));
         }
 
 
         static void DrawPackageRow(PackageInfo package)
         {
-            var visibilityLabel = package.isPrivate ? PrivateLabelContent : PublicLabelContent;
+            var visibilityLabel = package.isPrivate ? "priv" : "   ";
+            var visibilityIcon = package.isPrivate ? LockedIcon() : GUIContent.none;
 
             EditorGUILayout.LabelField(package.name);
-            EditorGUILayout.LabelField(visibilityLabel, EditorStyles.miniLabel);
+            GUILayout.Space(4);
+            EditorGUILayout.LabelField(package.packageName, EditorStyles.miniLabel, PackageNameLabelViewConf);
+            // EditorGUILayout.LabelField(visibilityLabel, EditorStyles.miniLabel, VisibilityLabelViewConf);
+            EditorGUILayout.LabelField(visibilityIcon, VisibilityLabelViewConf);
+            EditorGUILayout.LabelField(package.version, EditorStyles.miniLabel, InstalledLabelViewConf);
 
-            if (GUILayout.Button("View On Github"))
-            {
-                Application.OpenURL(package.url);
-            }
+            var currentVersion = PackageInstaller.CurrentVersion(package);
 
-            if (GUILayout.Button("Info"))
-            {
-                Debug.Log(JsonUtility.ToJson(package, true));
-            }
 
             if (package.IsInstalled)
             {
-                if (PackageInstaller.CurrentVersion(package) == package.urlForUPM)
-                {
-                    GUILayout.Label("Installed");
-                }
-                else
-                {
-                    if (GUILayout.Button("Update to " + package.urlForUPM))
-                    {
-                        PackageInstaller.InstallPackage(package);
-                    }
-                }
+                GUILayout.Label("Installed", InstalledLabelViewConf);
             }
             else
             {
-                if (GUILayout.Button("Install"))
-                {
-                    PackageInstaller.InstallPackage(package);
-                }
+                GUILayout.Label(string.Empty, InstalledLabelViewConf);
             }
         }
     }

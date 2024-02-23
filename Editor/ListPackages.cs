@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using PackagesList.Database;
 using PackagesList.Tokens;
 using PackagesList.View;
 using UnityEditor;
@@ -22,7 +23,6 @@ namespace PackagesList
         readonly IField<string> token = new InMemoryField<string>();
         readonly IField<string> githubUser = new EditorPrefsStringField("PackagesList.UserName");
         readonly IField<bool> isOrganization = new EditorPrefsBoolField("PackagesList.UserName.IsOrg");
-        readonly List<PackageInfo> packages = new();
 
         [MenuItem(CompanyName + "/Packages/List")]
         public static void ShowWindow()
@@ -47,9 +47,6 @@ namespace PackagesList
         async void DrawTokenField()
         {
             EditorGUILayout.LabelField("Token is required to fetch packages from Github");
-
-            //you can find your token here : [button find token] 
-
 
             if (string.IsNullOrEmpty(hiddenToken.Value))
             {
@@ -78,11 +75,11 @@ namespace PackagesList
 
             DrawSeparator();
 
-            if (packages.Count > 0)
+            if (PackagesDatabase.List.Count > 0)
             {
                 if (GUILayout.Button("Clear List"))
                 {
-                    packages.Clear();
+                    PackagesDatabase.Clear();
                 }
             }
             else
@@ -101,15 +98,13 @@ namespace PackagesList
 
         async void FetchPackages()
         {
-            packages.Clear();
-            EditorUtility.DisplayProgressBar("Downloading Packages", "Fetching packages from Github", 0.5f);
-
+            PackagesDatabase.Clear();
+            EditorUtility.DisplayProgressBar("Downloading Packages", "Fetching packages from Github", 0.25f);
             try
             {
-                var newPackages =
-                    await GithubPackagesRepository.DownloadPackages(token.Value, githubUser.Value,
+                var newPackages = await GithubPackagesRepository.DownloadPackages(token.Value, githubUser.Value,
                         isOrganization.Value);
-                packages.AddRange(newPackages);
+                PackagesDatabase.Set(newPackages);
             }
             catch (Exception e)
             {
@@ -123,7 +118,7 @@ namespace PackagesList
 
         void DisplayPackages()
         {
-            if (packages.Count == 0)
+            if (PackagesDatabase.List.Count == 0)
             {
                 "NoPackagesFound".DrawHelpBox();
                 return;
@@ -144,7 +139,7 @@ namespace PackagesList
             using var scrollView = new EditorGUILayout.ScrollViewScope(scroll);
 
             DrawSeparator();
-            foreach (var package in packages)
+            foreach (var package in PackagesDatabase.List)
             {
                 PackageDrawer.DrawRow(package);
                 DrawSeparator();

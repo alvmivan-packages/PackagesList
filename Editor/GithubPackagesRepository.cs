@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Net;
 using System.Threading.Tasks;
+using UnityEditor;
 using UnityEngine;
 
 namespace PackagesList
@@ -50,6 +51,7 @@ namespace PackagesList
 
 
             var packageJsons = await Task.WhenAll(packageJsonsTask);
+
 
             list = list
                 .Select((package, i) => package.SetPackageInfo(packageJsons[i]))
