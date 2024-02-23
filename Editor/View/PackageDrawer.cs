@@ -92,7 +92,7 @@ namespace PackagesList.View
         void TryDrawJson(PackageInfo package)
         {
             GUILayout.Space(5);
-            var showJson = GUILayout.Toggle(packageNameToShowJson.Contains(package.name), "Show Full Json");
+            var showJson = EditorGUILayout.Foldout(packageNameToShowJson.Contains(package.name), "Full Json");
             if (showJson)
             {
                 packageNameToShowJson.Add(package.name);
@@ -105,8 +105,21 @@ namespace PackagesList.View
             if (!showJson) return;
             GUILayout.Space(5);
             EditorViewTools.DrawSeparatorHorizontal();
-            EditorGUILayout.TextArea(JsonUtility.ToJson(package, true), GUILayout.ExpandHeight(true));
+            var json = JsonUtility.ToJson(package, true);
+            json = TryHideToken(json);
+            EditorGUILayout.TextArea(json, GUILayout.ExpandHeight(true));
             EditorViewTools.DrawSeparatorHorizontal();
+        }
+
+        static string TryHideToken(string mayContentToken)
+        {
+            const string wordToReplace = "YOUR_GITHUB_TOKEN";
+            //token form (some stuff)x-access-token:TOKEN@github(some other stuff)
+            if (!mayContentToken.Contains("x-access-token")) return mayContentToken;
+            var tokenStart = mayContentToken.IndexOf("x-access-token", System.StringComparison.Ordinal);
+            var tokenEnd = mayContentToken.IndexOf("@github", System.StringComparison.Ordinal);
+            var token = mayContentToken.Substring(tokenStart, tokenEnd - tokenStart);
+            return mayContentToken.Replace(token, "x-access-token:" + wordToReplace);
         }
 
         static void DrawInstallButton(PackageInfo package)

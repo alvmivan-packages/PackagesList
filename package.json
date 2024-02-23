@@ -4,8 +4,8 @@
     "name": "Marcos Alvarez",
     "email": "alvmivan@gmail.com"
   },
-  "version": "0.0.3",
-  "displayName": "PackagesList",
+  "version": "0.0.4",
+  "displayName": "Packages List",
   "description": "",
   "unity": "2021.3",
   "dependencies": {}
