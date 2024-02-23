@@ -38,7 +38,7 @@ namespace PackagesList
             var json = await webClient.DownloadStringTaskAsync(url);
 
 
-            var fromJson = JsonHelper.FromJson<RepositoryDto>(json);
+            var fromJson = RepositoriesJsonHelper.FromJson<RepositoryDto>(json);
 
             if (fromJson.Length == 0) return new List<PackageInfo>();
 

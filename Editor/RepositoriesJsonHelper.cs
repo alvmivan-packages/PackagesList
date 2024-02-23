@@ -3,7 +3,7 @@ using UnityEngine;
 
 namespace PackagesList
 {
-    public static class JsonHelper
+    public static class RepositoriesJsonHelper
     {
         public static T[] FromJson<T>(string json)
         {
