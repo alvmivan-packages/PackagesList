@@ -24,19 +24,29 @@ namespace PackagesList
         const int ListRowHeight = 20;
         const int Height = 900;
 
-        readonly IField<string> hiddenToken = new InMemoryField<string>();
-        readonly IField<string> token = new InMemoryField<string>();
-        readonly IField<string> githubUser = new EditorPrefsStringField("PackagesList.UserName");
-        readonly IField<bool> isOrganization = new EditorPrefsBoolField("PackagesList.UserName.IsOrg");
+        static readonly IField<string> HiddenToken = new InMemoryField<string>();
+        public static readonly IField<string> Token = new InMemoryField<string>();
+        static readonly IField<string> GithubUser = new EditorPrefsStringField("PackagesList.UserName");
+        static readonly IField<bool> IsOrganization = new EditorPrefsBoolField("PackagesList.UserName.IsOrg");
 
 
         readonly PackagesView packagesView = new(ListRowHeight);
+
+        [MenuItem(CompanyName + "/Packages/Clear Cache")]
+        public static void ClearCache()
+        {
+            PackagesDatabase.Clear();
+            HiddenToken.Value = string.Empty;
+            Token.Value = string.Empty;
+        }
 
         [MenuItem(CompanyName + "/Packages/List")]
         public static void ShowWindow()
         {
             var window = GetWindow<ListPackages>(false, "Packages List");
             PackagesView.Deselect();
+            HiddenToken.Value = string.Empty;
+            Token.Value = string.Empty;
             window.minSize = new Vector2(ListWidth, Height);
             window.Show();
         }
@@ -52,7 +62,7 @@ namespace PackagesList
                 minSize = new Vector2(ListWidth + InspectorWidth, Height);
             }
 
-            if (string.IsNullOrEmpty(token.Value))
+            if (string.IsNullOrEmpty(Token.Value))
             {
                 DrawTokenField();
             }
@@ -66,7 +76,7 @@ namespace PackagesList
         {
             EditorGUILayout.LabelField("Token is required to fetch packages from Github");
 
-            if (string.IsNullOrEmpty(hiddenToken.Value))
+            if (string.IsNullOrEmpty(HiddenToken.Value))
             {
                 TokenInfo.DrawHelpBox();
                 if (GUILayout.Button("Find Token", GUILayout.MaxWidth(200)))
@@ -74,21 +84,21 @@ namespace PackagesList
                     TokenHandler.OpenGithubPageToGenerateAToken();
                 }
 
-                hiddenToken.Value = await TokenHandler.GetToken();
+                HiddenToken.Value = await TokenHandler.GetToken();
                 return;
             }
 
             if (GUILayout.Button("Get Token", GUILayout.MaxWidth(200)))
             {
-                token.Value = hiddenToken.Value;
+                Token.Value = HiddenToken.Value;
             }
         }
 
         void DrawRegularWindow()
         {
             EditorGUILayout.BeginHorizontal();
-            githubUser.Value = EditorGUILayout.TextField("Github User", githubUser.Value, GUILayout.MinWidth(600));
-            isOrganization.Value = EditorGUILayout.Toggle("Org", isOrganization.Value, GUILayout.MaxWidth(200));
+            GithubUser.Value = EditorGUILayout.TextField("Github User", GithubUser.Value, GUILayout.MinWidth(600));
+            IsOrganization.Value = EditorGUILayout.Toggle("Org", IsOrganization.Value, GUILayout.MaxWidth(200));
             EditorGUILayout.EndHorizontal();
 
             EditorViewTools.DrawSeparatorHorizontal();
@@ -120,8 +130,8 @@ namespace PackagesList
             EditorUtility.DisplayProgressBar("Downloading Packages", "Fetching packages from Github", 0.25f);
             try
             {
-                var newPackages = await GithubPackagesRepository.DownloadPackages(token.Value, githubUser.Value,
-                    isOrganization.Value);
+                var newPackages = await GithubPackagesRepository.DownloadPackages(Token.Value, GithubUser.Value,
+                    IsOrganization.Value);
                 PackagesDatabase.Set(newPackages);
             }
             catch (Exception e)
